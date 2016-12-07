@@ -1,0 +1,220 @@
+---
+title: "R Introduction (I)"
+author: "Dr. Zhuanghua Shi"
+date: "6 December 2016"
+output: beamer_presentation
+header-includes:
+ - \usetheme{metropolis}
+ - \def\begincols{\begin{columns}\begin{column}}
+ - \def\endcols{\end{column}\end{columns}}
+ - \def\colsep{\end{column}\begin{column}}
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(pander)
+library(dplyr)
+library(ggplot2)
+library(xtable)
+options(xtable.comment=FALSE, digits = 2)
+knitr::opts_chunk$set(echo = FALSE,fig.align='center')
+```
+
+## Psychophysics and data analysis
+
+* Behavioral data
+    * Reaction time
+    * Accuracy
+    * Rating, categorical task (Left/right)
+* Analyses
+    * Mean data and simple plots
+    * ANOVAs
+    * linear regression and GLM
+    * complex models
+
+## statistical tools
+* Excel
+* SPSS
+* Matlab
+* SAS / Jmp
+* Python
+* R 
+
+## Programming
+
+When talking about 'programming'...
+
+```{r, out.width='85%'}
+include_graphics('figs/debugging.jpg')
+```
+
+## R is not programming, rather data mining
+
+* R let you focus on your data
+    * figure out what you want to do with data
+* _dplyr_ package simplify common data manipulation tasks
+    * use grammar-like language
+    * focusing on data _table_ (similar to pivot table in excel)
+    * pip function lets you do multiple manipulate all in one chain
+* _ggplot2_ package provides powerful yet simple plot language
+
+## Four main tasks in data mining
+* Reading and cleaning data
+* Manipulate data (e.g., basic summaries, linear estimation)
+* Statistical tests
+* Visualization
+
+## Import data
+
+* Reading text or excel data
+    * read.csv()
+    * read.xlsx() from xlsx package
+    * fread() from data.table package
+* Reading matlab file
+    * readMat() from R.matlab
+    
+```{r, echo = TRUE}
+dat = read.csv('stroop.csv')
+head(dat, n = 3)
+```
+
+## Table structure in R
+
+\begincols {0.4\textwidth}
+
+* R tables: data.frame(), data.table()
+* Keep your data in 'Tidy' format
+
+\colsep {0.6\textwidth}
+
+```{r, out.width='75%'}
+include_graphics('figs/r_table.pdf')
+```
+\endcols
+
+## Table Column variables
+
+* Column variables can have different types of data
+  * numeric
+  * factor
+  * charactors
+* You can change their types by using 'as.___' functions
+    * as.numeric()
+    * as.factor()
+
+## Data Wrangling
+
+\begincols {0.6\textwidth}
+
+* Use Data-wrangling-cheatsheet.pdf as a reference
+    * library('dplyr') # include dplyr package
+* Five types of data manipulations
+    * select
+    * filter
+    * arrange
+    * mutate
+    * summarize
+* Always think about your data __tables__, _not_ programming
+
+
+\colsep {0.4\textwidth}
+
+```{r, fig.align='center', out.width='100%'}
+knitr::include_graphics('figs/r_data_manipulations.pdf')
+```
+\endcols
+
+## pipes
+
+* Pipe operator:
+
+> %>% 
+
+* Pipes can be cancatenated
+
+```{r, fig.align='center', out.width='75%'}
+knitr::include_graphics('figs/r_dplyr_pipes.pdf')
+```
+
+```{r, echo = TRUE}
+dat %>% summarise(mean_accuracy = mean(acc))
+```
+
+## Combine all manipulations together
+
+* Data analysis sketch
+
+> With 'dat' table, I want to filter out those error trials, and then average mean reaction times for individual participants
+
+* Translate to R grammar-like language
+
+```{r, echo = TRUE}
+dat %>% filter(acc == TRUE) %>% group_by(sub) %>% 
+  summarise(mRT = mean(rt))
+```
+
+## Data manipulations
+
+* summarise()
+    * available functions can be found in the cheatsheet
+
+>  summarise(dat, sum = sum(A), avg = mean(B), sd = sd(C))
+
+* mutate()
+    * calculate new variables (columns)
+
+> mutate(dat, RTms = rt *1000)
+    
+* filter()
+    * subset observations (rows)
+    
+> filter(dat, acc == TRUE)
+
+## Data manipulations
+
+* select()
+    * subset variables
+    
+> select(dat, one_of(c('sub','rt')))
+
+* group_by()
+    * group data
+  
+> group_by(dat, sub, congruency)
+
+* All those manipulations can be pipped together
+
+## Analysis with pipes
+
+```{r, echo = TRUE}
+library(dplyr) #includen dplyr package
+dat <- read.csv('stroop.csv') # read data
+meanRT <- dat %>% filter(acc == TRUE) %>% # only correct trials
+  group_by(sub, congruency) %>% # group: sub, congruency
+  summarise(mRT = mean(rt))  # average RTs
+summary(meanRT) #show summary of the final table
+```
+
+## Tips
+
+* store operators
+    * = , <- , ->
+    * '<-' is recommended
+
+```{r, echo = TRUE}
+dat <- read.csv('stroop.csv')
+read.csv('stroop.csv') -> dat
+```
+
+* change table variable names
+
+```{r, echo = TRUE}
+names(dat) <- c('trlNo','Color','Congruency','RT','Accuracy','SubNo')
+str(dat)
+```
+
+
+
+
+
+

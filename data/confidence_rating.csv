@@ -1,0 +1,6 @@
+Response_Type;Response;Present;Absent
+Present;1;0.3;0.1
+Possible present;2;0.3;0.3
+Not Sure;3;0.2;0.1
+Possible absent;4;0.1;0.3
+Absent;5;0.1;0.2

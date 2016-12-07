@@ -1,0 +1,219 @@
+---
+title: "R Introduction and RT analysis (II)"
+author: "Dr. Zhuanghua Shi"
+date: "14 Nov. 2016"
+output: beamer_presentation
+header-includes:
+  - \usetheme{metropolis}
+  - \def\begincols{\begin{columns}\begin{column}}
+  - \def\endcols{\end{column}\end{columns}}
+  - \def\colsep{\end{column}\begin{column}}
+---
+  
+```{r setup, include=FALSE}
+library(knitr)
+library(pander)
+library(dplyr)
+library(ggplot2)
+library(xtable)
+library(fitdistrplus)
+library(ez)
+library(statmod) # invgauss distribution
+options(xtable.comment=FALSE, digits = 2)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, fig.align='center')
+```
+
+## R is not programming, rather data mining
+
+* R let you focus on your data
+* figure out what you want to do with data
+* _dplyr_ package simplify common data manipulation tasks
+* use grammar-like language
+* focusing on data _table_ (similar to pivot table in excel)
+* pip function lets you do multiple manipulate all in one chain
+* _ggplot2_ package provides powerful yet simple plot language
+
+## Last week: Reading text data
+
+* Please name one or two functions to read text files
+
+\pause
+
+    * read.csv()
+    * fread() from data.table package
+
+For example, 
+
+```{r, echo = TRUE}
+dat = read.csv('stroop.csv')
+head(dat, n = 3)
+```
+
+## Last week: dplyr functions and pipes
+
+* Please tell me the analysis conducted by the following
+
+> dat %>% filter(acc == TRUE) %>% 
+      group_by(sub, congruency) %>% 
+      summarise(mRT = mean(rt))  
+
+## ggplot2 package
+
+ggplot2 is based on the __grammar of graphics__:
+
+* a __data__ set
+* a set of __geoms__
+* a __coordinate system__
+
+> ggplot(data, aes(x,y)) + geom_point() + geom_smooth(method = 'lm')
+
+* _Note_: operator for the layer concatenation is __+__.
+
+## Bar plot
+
+> geom_bar(stat = 'identity', position = 'dodge')
+
+* Error rates for each participants from the stroop task
+
+```{r, echo = TRUE, out.width= '30%'}
+
+dat %>% group_by(sub) %>% 
+  summarise(error_rate = 1- mean(acc)) %>%
+  ggplot(data = ., aes(x = sub, y = error_rate)) + 
+  geom_bar(stat='identity') + xlab('Participant No') +
+  ylab('Error rate')
+
+```
+
+
+## Lines plot
+
+> geom_line()
+
+* Mean error rates as a function of congruency
+
+```{r, echo = TRUE,  out.width= '30%'}
+
+dat %>% group_by(sub, congruency) %>% 
+  summarise(er = 1 - mean(acc)) %>%  group_by(congruency) %>% summarize(error_rate = mean(er)) %>%
+  ggplot(aes(x = congruency, y = error_rate, group = 1)) + geom_line()
+
+```
+
+## Error bars
+
+> geom_errorbar(aes(ymin, ymax))
+
+* plot mean RT and error bars for 3 congruency conditions
+
+```{r, echo = TRUE,  out.width= '30%'}
+mdat <- dat %>% filter(acc == TRUE) %>%  group_by(sub, congruency) %>%
+  summarize(mRT = mean(rt)) 
+mdat %>%  group_by(congruency) %>% 
+  summarize(mmRT = mean(mRT), se = sd(mRT)/sqrt(max(sub)-1)) %>%
+  ggplot( aes(x = congruency, ymin = mmRT -se, ymax = mmRT +se)) + 
+  geom_errorbar()
+```
+
+## Multple layers and faceting
+
+\begincols {0.5\textwidth}
+
+* Layers can be added together using '+'
+* Multiple lines are possible, ending with '+'
+* Fine control via __Scales__
+    * e.g., scale_fill_manual, scale_x_log10(), ...
+* multiple subplots using facet_*
+
+\colsep {0.5\textwidth}
+
+```{r, echo = TRUE,  fig.width = 4, fig.height= 3, out.width = '80%'}
+
+dat %>% filter(acc == TRUE & rt < 2) %>%
+  ggplot(aes(x = rt)) + 
+  geom_histogram() + 
+  facet_wrap(~sub, nrow = 2)
+```
+
+\endcols
+
+## rm-ANOVA analysis
+
+* ez packages
+* ezANOVA 
+
+```{r, echo = TRUE}
+
+res <- ezANOVA( data.frame(mdat), 
+         dv = mRT,
+         wid =as.factor(sub),
+         within = congruency)
+res$ANOVA
+
+```
+
+## ezPlot
+
+* Similar to __ezANOVA__, __ezPlot__ provides easy visualization of effect from factorial experiments. 
+
+```{r, echo = TRUE, fig.width=4, fig.height = 3, out.width = '45%'}
+
+ezPlot(data.frame(mdat), dv = mRT, wid = as.factor(sub), 
+       within = congruency,  x = congruency)
+
+```
+
+
+## Distribution analysis
+
+* package _fitdistrplus_
+
+```{r, echo = TRUE, results = 'asis'}
+#df <- fitdist(dat$rt, "invgauss", start = c(0.5, 1))
+#df$estimate
+fitfun <- function(df) {
+  fd = fitdist(df$rt, 'invgauss', start = c(0.5, 1))
+  data.frame(mu = fd$estimate[1],lambda = fd$estimate[2]) }# return
+dat %>% filter(acc == TRUE) %>% group_by(congruency) %>%
+  do(fitfun(.)) -> fitdf
+xtable(fitdf)
+```
+
+## Vincentization
+
+* order rts and quantile them
+
+```{r, echo = TRUE, fig.width=4, fig.height = 3, out.width = '45%'}
+dat %>% filter(acc == TRUE ) ->dat
+dat$decile <- as.numeric(cut(dat$rt, quantile(dat$rt, probs = seq(0,1,0.1)), include.lowest = TRUE))
+dat %>% group_by(congruency, decile) %>% 
+  summarize(mRT = mean(rt)) %>% 
+  ggplot(aes(x=mRT, y = decile, color = congruency)) + 
+  geom_point() + geom_line()
+```
+
+## Drift Diffusion Model (DDM)
+
+Several packages are available in R for DDM:
+
+* RWiener package
+
+> https://github.com/yeagle/RWiener
+
+* rtdists package
+
+> https://github.com/rtdists/rtdists
+
+## Tomorrow practical assignments
+
+* Scene-based contextual adaptation by __Markus Conci__
+
+\small In order to deal with our complex visual environment, human observers have developed the capability to extract statistical regularities from our ambient array, thereby optimizing perception and action. For instance, in visual search, detection of a target is faster when a layout of nontarget items is repeatedly encountered, illustrating that learned contextual associations can guide attention (contextual cueing; Chun & Jiang, 1998). Observers learn a target-to-context association relatively quickly and efficiently, but relocating the target to an unexpected location (within otherwise unchanged contexts) completely abolishes contextual cueing and the benefits deriving from the invariant context recover slowly and only with extensive training (Zellin, von Mühlenen, Müller & Conci, 2014). Here, we will explore the dynamics of contextual adaptation in more realistic search scenarios using search layouts with natural scene contexts to test whether inefficient adaptation can be remedied by providing a "rich" search context.
+
+## Tomorrow practical assignments
+
+* The role of emotion in spatial working memory by __Artyom Zinchenko__
+
+Emotional quality of stimuli was shown to influence cognitive processes (e.g., cognitive control; Kanske, 2012; Xue et al., 2013). For instance, studies showed that negative emotion is able to facilitate conflict resolution between opposing action tendencies (Zinchenko et al., 2015). However, the role of emotion in the spatial working memory is less clear, as this topic received less attention from the scientific community. Therefore, in the present study we are going to test whether task-irrelevant emotional (negative, positive) compared to neutral stimuli are able to influence implicit memory for invariant spatial configurations (i.e., contextual cueing).
+
+

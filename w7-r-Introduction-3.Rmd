@@ -1,0 +1,154 @@
+---
+title: "R Introduction and SDT"
+author: "Dr. Zhuanghua Shi"
+date: "28 Nov. 2016"
+output: beamer_presentation
+header-includes:
+  - \usetheme{metropolis}
+  - \def\begincols{\begin{columns}\begin{column}}
+  - \def\endcols{\end{column}\end{columns}}
+  - \def\colsep{\end{column}\begin{column}}
+---
+  
+```{r setup, include=FALSE}
+library(knitr)
+library(pander)
+library(dplyr)
+library(ggplot2)
+library(xtable)
+library(fitdistrplus)
+library(ez)
+library(statmod) # invgauss distribution
+options(xtable.comment=FALSE, digits = 2)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, fig.align='center')
+```
+
+## Last week homework (1)
+
+```{r, echo = TRUE}
+dat = read.csv('search_rt.csv')
+# summary(dat) # use this to check the data structure
+# find out outliers
+msub <- dat %>% filter(error == FALSE) %>% 
+  group_by(sub) %>% 
+  summarise(sd_rt = sd(rt), mrt = mean(rt)) %>%
+  mutate(low_bound =  mrt - 2.5*sd_rt, 
+         up_bound = mrt+2.5*sd_rt)
+```
+
+## Last week homework (2)
+
+```{r, echo = TRUE, results = 'asis'}
+# average reaction times for individual subjects
+msub_rt <- left_join(dat, msub, by = c('sub')) %>% 
+  mutate(outlier = rt>up_bound | rt<low_bound) %>%
+  filter(outlier == FALSE & error == FALSE) %>% 
+  group_by(sub, BlkType, target) %>% 
+  summarise(mrt = mean(rt), sd = sd(rt))
+#summary(msub_rt)
+xtable(msub_rt[1:5,])
+```
+
+## Last week homework (3)
+
+```{r, echo = TRUE, fig.width= 4, fig.height= 3, out.width= '50%'}
+# plot graphs
+msub_rt %>% group_by (BlkType, target) %>% 
+summarise(mmrt = mean(mrt), se = sd(mrt)/sqrt(nlevels(sub)-1)) %>%
+ggplot(aes(x = BlkType, y = mmrt, fill = target, color = target)) + 
+geom_bar(stat = 'identity', position = 'dodge') + 
+geom_errorbar(aes(ymax = mmrt + se, ymin = mmrt - se), 
+position = 'dodge') + coord_cartesian(ylim = c(0.4, 0.6))
+
+```
+
+## Last week homework (4)
+
+```{r, echo = TRUE, results='asis'}
+
+anova_result <- ezANOVA(data.frame(msub_rt),
+                        dv = mrt, wid = sub, 
+                        within = .(BlkType, target))
+xtable(anova_result$ANOVA)
+```
+
+
+## Last week homework (5)
+```{r, echo = TRUE, fig.width=4, fig.height= 3, out.width='50%'}
+# plot using ez package
+ezPlot(data.frame(msub_rt), dv = mrt, wid = sub, 
+       within = .(BlkType, target), x = BlkType, split = target)
+
+```
+
+## Signal Detection Theory 
+
+* Signal Detection table
+
+Response    Signal    Noise
+--------    -------   -----------------------
+Yes         Hit(H)    False Alarm (FA)
+No          Miss(M)   Correct rejection (CR)
+
+* Eaqual variance 
+
+$$ d' = z(H) - Z(FA)$$
+
+$$ C = - \frac{(z(H)+ z(FA))}{2}$$
+
+## Example A: Multiple-choice Test
+
+`sub_grades` was from a multiple-choise test made by students. In total there were 10 correct items and 10 incorrect items. The table shows individuals' performance. Your task is to calculate the d' and C.  
+
+```{r, echo = TRUE}
+grades <- read.csv2('sub_grades.csv')
+# examin the data and refine
+grades <- grades[1:13,1:5]
+
+```
+
+## Example A: Calculate d' and C
+
+
+```{r, echo = TRUE}
+# Calculate d', and C
+grades <- grades %>% mutate(H = Hit/Correct.Items, 
+                  FA = 1- Correct.Rejection/Incorrect.Items) %>%
+  mutate(zH = qnorm(pmin(H,0.999)), zF = qnorm(pmax(0.001, FA))) %>%
+  mutate(d = zH-zF, C = -(zH+zF)/2)
+
+```
+
+## Example A: Visualize results
+
+```{r, echo = TRUE, fig.width=4,fig.height=3, out.width= '60%'}
+
+ggplot(grades, aes(x = d, y = C, label = StudNo)) + 
+  geom_point() + geom_text(hjust = 0, nudge_x = 0.05)
+
+```
+
+## Example A: Visualize results (2)
+
+```{r, echo = TRUE, fig.width=4,fig.height=3, out.width= '60%'}
+
+ggplot(grades, aes(x = FA, y = H, label = StudNo)) + 
+  geom_point() + geom_text(hjust = 0, nudge_x = 0.05) + 
+  coord_cartesian(xlim = c(0,1), ylim = c(0,1))
+
+```
+
+## Example B: Confidence rating judgment
+
+```{r, echo = TRUE, results = 'asis'}
+
+rating <- read.csv2('confidence_rating.csv')
+
+xtable(rating)
+```
+
+## Example B: Your task
+
+* Calculate d' and C for different confidence levels
+* Plot a ROC curve
+
