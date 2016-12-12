@@ -105,7 +105,7 @@ try
     end
     namerand = num2str(rand);
     subname = [expinfo.subname(1:3) namerand(3:6)];
-    expinfo.filename = [tmp subname '.mat'];
+    expinfo.filename = [tmp subname];
     
 catch ME
     disp(ME.message);
@@ -114,7 +114,8 @@ end
 function status = run_save(expinfo, results)
 % function for saving data
 try    
-    save(expinfo.filename, 'results');
+    %save([expinfo.filename,'.mat'], 'results');
+    csvwrite([expinfo.filename,'.csv'],results);
     status = 1;
 catch ME
     status = 0;
